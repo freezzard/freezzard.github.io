@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Noy CoSign — Stabilizer Testnet POC</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#0b0e11;color:#eaecef;margin:24px;max-width:720px}
+  button{background:#f0b90b;color:#000;border:0;border-radius:8px;padding:12px 18px;font-size:16px;font-weight:600;cursor:pointer;margin:6px 6px 6px 0}
+  button:disabled{background:#474d57;color:#999;cursor:not-allowed}
+  #log{background:#12161c;border:1px solid #2b3139;border-radius:8px;padding:12px;white-space:pre-wrap;font-family:monospace;font-size:13px;min-height:180px}
+  .kv{font-family:monospace}
+</style>
+</head>
+<body>
+<h2>Noy CoSign — Stabilizer POC (Arbitrum Sepolia)</h2>
+<p>Personal co-sign tool. Connects via WalletConnect with required chain <span class="kv">421614</span> only.<br/>
+Test transaction: <b>Swap 10 USDT0 → USDC</b> via Stabilizer Router <span class="kv">0xDE7982552434eEEc97f838C97aE680FC0E82cb72</span>, value 0.</p>
+<button id="btnConnect">1) Connect WalletConnect</button>
+<button id="btnSwap" disabled>2) Swap 10 USDT0 → USDC</button>
+<p id="status">Status: not connected</p>
+<div id="log">log:\n</div>
+<script src="https://unpkg.com/@walletconnect/ethereum-provider@2.21.0/dist/index.umd.js"></script>
+<script>
+const PROJECT_ID = "0f00a65bf7edc4b8714a33a6b3b778fb"; // Stabilizer app's public WalletConnect projectId (from its official web bundle)
+const CHAIN_ID = 421614;
+const ROUTER = "0xDE7982552434eEEc97f838C97aE680FC0E82cb72";
+const USDT0 = "0x0030150861d706Cdd94f2fa8506Ec8fC69F8D7fE";
+const USDC  = "0x900F5699416068F47dD77B5c27CA725707D380D8";
+// calldata: swap(address,address,uint256,uint256) selector 0xfe029156, amountIn=10e18, minOut=0
+const SWAP_DATA = "0xfe029156"
+  + USDT0.slice(2).toLowerCase().padStart(64,"0")
+  + USDC.slice(2).toLowerCase().padStart(64,"0")
+  + (10n*10n**18n).toString(16).padStart(64,"0")
+  + "0".padStart(64,"0");
+let provider=null, account=null;
+const logEl=document.getElementById('log');
+function log(m){ logEl.textContent += m + "\n"; }
+function setStatus(s){ document.getElementById('status').textContent = "Status: " + s; }
+async function connect(){
+  try{
+    if(!window["@walletconnect/ethereum-provider"] && !window.WalletConnectEthereumProvider){
+      log("WC provider UMD global not found. Keys: " + Object.keys(window).filter(k=>k.toLowerCase().includes('wallet')).join(','));
+    }
+    const WCProvider = window.WalletConnectEthereumProvider || (window["@walletconnect/ethereum-provider"] && window["@walletconnect/ethereum-provider"].EthereumProvider);
+    log("Initializing provider, required chain " + CHAIN_ID + " ...");
+    provider = await WCProvider.init({
+      projectId: PROJECT_ID,
+      chains: [CHAIN_ID],
+      optionalChains: [],
+      showQrModal: true,
+      metadata: { name: "Noy CoSign — Stabilizer POC", description: "Personal co-sign tool for Stabilizer testnet (Arbitrum Sepolia)", url: "https://app.stabilizer.finance", icons: [] },
+      rpcMap: { 421614: "https://sepolia-rollup.arbitrum.io/rpc" }
+    });
+    provider.on("display_uri", uri => log("display_uri: " + uri));
+    provider.on("chainChanged", c => log("chainChanged: " + c));
+    provider.on("accountsChanged", a => log("accountsChanged: " + JSON.stringify(a)));
+    log("Opening QR modal — waiting for scan/approve in Rabby...");
+    const accounts = await provider.enable();
+    account = accounts[0];
+    log("Connected accounts: " + JSON.stringify(accounts));
+    log("Session chainId: " + provider.chainId);
+    setStatus("connected " + account + " chain " + provider.chainId);
+    if(provider.chainId === CHAIN_ID){ document.getElementById('btnSwap').disabled = false; }
+    else { log("WARNING: session chain is not 421614"); }
+  }catch(e){ log("CONNECT ERROR: " + (e && e.message ? e.message : JSON.stringify(e))); setStatus("connect failed"); }
+}
+async function swap(){
+  try{
+    log("Sending eth_sendTransaction (swap 10 USDT0 -> USDC, minOut 0) — approve in Rabby...");
+    const txHash = await provider.request({ method: "eth_sendTransaction", params: [{ from: account, to: ROUTER, data: SWAP_DATA, value: "0x0" }] });
+    log("TX HASH: " + txHash);
+    setStatus("swap sent: " + txHash);
+  }catch(e){ log("SWAP ERROR: " + (e && e.message ? e.message : JSON.stringify(e))); }
+}
+document.getElementById('btnConnect').onclick = connect;
+document.getElementById('btnSwap').onclick = swap;
+log("page ready. swap calldata: " + SWAP_DATA);
+</script>
+</body>
+</html>
