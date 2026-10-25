@@ -475,12 +475,14 @@
       function balanceOfData(address) {
         return "0x70a08231" + address.toLowerCase().replace("0x", "").padStart(64, "0");
       }
-      function fetchBnbPrice() {
-        return fetchJson("https://api.coinbase.com/v2/exchange-rates?currency=BNB").then(function (j) {
-          var v = Number(j && j.data && j.data.rates && j.data.rates.USDT);
+      function fetchCoinPriceUsd(code) {
+        return fetchJson("https://api.coinbase.com/v2/exchange-rates?currency=" + code).then(function (j) {
+          var rates = (j && j.data && j.data.rates) || {};
+          var v = Number(rates.USD != null ? rates.USD : rates.USDT);
           return isFinite(v) && v > 0 ? v : null;
         }).catch(function () { return null; });
       }
+      function fetchBnbPrice() { return fetchCoinPriceUsd("BNB"); }
       function fetchAgentpunkFloors() {
         return fetchJson("https://agentpunk.fun/api/market.php", 20000).then(function (json) {
           var floors = {};
@@ -559,7 +561,10 @@
         var blur = hideBalances ? " blur-balance" : "";
         var statusHtml = "Saldo &amp; kepemilikan dibaca langsung dari chain saat halaman dibuka · terakhir " +
           fmtWib(w.fetchedAt);
-        if (w.bnbPriceUsd != null) statusHtml += " · BNB <span class='num'>" + fmtUsd(w.bnbPriceUsd) + "</span> (Coinbase)";
+        if (w.bnbPriceUsd != null) statusHtml += " · BNB <span class='num'>" + fmtUsd(w.bnbPriceUsd) + "</span>";
+        if (w.ethPriceUsd != null) statusHtml += " · ETH <span class='num'>" + fmtUsd(w.ethPriceUsd) + "</span>";
+        if (w.polPriceUsd != null) statusHtml += " · POL <span class='num'>" + fmtUsd(w.polPriceUsd) + "</span>";
+        if (w.bnbPriceUsd != null || w.ethPriceUsd != null || w.polPriceUsd != null) statusHtml += " (Coinbase)";
         $("wallet-status").innerHTML = statusHtml;
 
         var html = "<div class='wallet-grid tick-in'>";
@@ -575,7 +580,14 @@
           "</p></div>" +
           "<div><p class='tiny dim'>BP (AnthroBit)</p><p class='num val'>" + a.bp + "</p></div>" +
           "<div><p class='tiny dim'>NFT dimiliki</p><p class='num val'>" + totalOwned +
-          " <span class='tiny' style='font-weight:600;color:var(--dim)'>item</span></p></div></div>" +
+          " <span class='tiny' style='font-weight:600;color:var(--dim)'>item</span></p></div>" +
+          (a.totalUsd != null
+            ? "<div><p class='tiny dim'>Total nilai ≈ USD</p><p class='num val'>" + fmtUsd(a.totalUsd) + "</p></div>"
+            : "") +
+          "</div>" +
+          (a.totalUsd != null
+            ? "<p class='tiny dim' style='margin-top:6px'>Total nilai = saldo BNB + nilai floor NFT di bawah.</p>"
+            : "") +
           "<div class='addr-row'><span class='num small dim'>" + shortAddr(a.address) + "</span>" +
           "<button type='button' class='btn btn-chip' data-copy='" + a.address + "' data-label='Alamat Agentic'>Salin alamat</button></div>" +
           "<p class='tiny dim' style='margin-top:8px'>" + esc(a.sessionNote) + "</p></article>";
@@ -587,11 +599,20 @@
           "<span class='badge badge-dim'>Watch-only</span></div>" +
           "<ul class='chain-list" + blur + "'>";
         w.rabby.chains.forEach(function (c) {
+          var usdTxt = "";
+          if (c.balance != null && c.priceUsd != null) {
+            usdTxt = "<span class='small' style='margin-left:6px;font-weight:500;color:var(--dim)'>≈ " + fmtUsd(c.balance * c.priceUsd) + "</span>";
+          }
           html += "<li><span class='dim'>" + esc(c.label) + "</span><span class='num' style='font-weight:600'>" +
             (c.balance == null ? "<span style='font-weight:400;color:var(--dim)'>gagal dimuat</span>"
-              : fmtBnb(c.balance) + " <span class='tiny' style='font-weight:500;color:var(--dim)'>" + esc(c.symbol) + "</span>") +
+              : fmtBnb(c.balance) + " <span class='tiny' style='font-weight:500;color:var(--dim)'>" + esc(c.symbol) + "</span>" + usdTxt) +
             "</span></li>";
         });
+        if (w.rabby.totalUsd != null) {
+          html += "<li style='border-top:1px solid var(--border);margin-top:4px;padding-top:8px'>" +
+            "<span style='font-weight:600'>Total semua chain</span>" +
+            "<span class='num' style='font-weight:700'>≈ " + fmtUsd(w.rabby.totalUsd) + "</span></li>";
+        }
         html += "</ul><div class='addr-row'><span class='num small dim'>" + shortAddr(w.rabby.address) + "</span>" +
           "<button type='button' class='btn btn-chip' data-copy='" + w.rabby.address + "' data-label='Alamat Rabby'>Salin alamat</button></div>" +
           "<p class='tiny dim' style='margin-top:8px'>Transaksi hanya lewat co-sign WalletConnect — kamu approve sendiri di Rabby.</p></article>";
@@ -641,7 +662,9 @@
           fetchBnbPrice(),
           fetchAgentpunkFloors(),
           bscRpc("eth_getBalance", [AGENTIC, "latest"]),
-          bscRpc("eth_call", [{ to: SHANIU_CONTRACT, data: balanceOfData(AGENTIC) }, "latest"])
+          bscRpc("eth_call", [{ to: SHANIU_CONTRACT, data: balanceOfData(AGENTIC) }, "latest"]),
+          fetchCoinPriceUsd("ETH"),
+          fetchCoinPriceUsd("POL")
         ];
         COLLECTIONS.forEach(function (def) {
           jobs.push(bscRpc("eth_call", [{ to: def.contract, data: balanceOfData(AGENTIC) }, "latest"]));
@@ -653,8 +676,10 @@
           var bnbPriceUsd = res[0], liveFloors = res[1];
           var agenticBnb = hexToNumber(res[2]);
           var shaniuBal = hexToNumber(res[3]);
-          var ownedHex = res.slice(4, 4 + COLLECTIONS.length);
-          var rabbyHex = res.slice(4 + COLLECTIONS.length);
+          var ethPriceUsd = res[4], polPriceUsd = res[5];
+          var ownedHex = res.slice(6, 6 + COLLECTIONS.length);
+          var rabbyHex = res.slice(6 + COLLECTIONS.length);
+          var priceBySymbol = { BNB: bnbPriceUsd, ETH: ethPriceUsd, POL: polPriceUsd };
 
           // Semua sumber inti gagal → tampilkan error, jangan angka karangan.
           if (agenticBnb == null && bnbPriceUsd == null && ownedHex.every(function (h) { return h == null; })) {
@@ -688,18 +713,35 @@
             if (y.floor.bnb != null) return 1;
             return x.name.localeCompare(y.name);
           });
+          var floorValueUsd = bnbPriceUsd != null ? floorValueBnb * bnbPriceUsd : null;
+          var agenticTotalUsd = (agenticBnb != null && bnbPriceUsd != null)
+            ? agenticBnb * bnbPriceUsd + (floorValueUsd || 0)
+            : floorValueUsd;
+          var rabbyChains = RABBY_CHAINS.map(function (c, i) {
+            return {
+              key: c.key, label: c.label, symbol: c.symbol,
+              balance: hexToNumber(rabbyHex[i]),
+              priceUsd: priceBySymbol[c.symbol] != null ? priceBySymbol[c.symbol] : null
+            };
+          });
+          var rabbyTotalUsd = null;
+          rabbyChains.forEach(function (c) {
+            if (c.balance != null && c.priceUsd != null) {
+              rabbyTotalUsd = (rabbyTotalUsd || 0) + c.balance * c.priceUsd;
+            }
+          });
           renderWallet({
             fetchedAt: now.toISOString(),
-            bnbPriceUsd: bnbPriceUsd,
+            bnbPriceUsd: bnbPriceUsd, ethPriceUsd: ethPriceUsd, polPriceUsd: polPriceUsd,
             agentic: {
               address: AGENTIC, agentId: "birashi.ai", bnb: agenticBnb, bp: AGENTIC_BP,
+              totalUsd: agenticTotalUsd,
               sessionNote: "Sesi s/d Senin 26 Okt 2026 · 22.43 WIB"
             },
             rabby: {
               address: RABBY,
-              chains: RABBY_CHAINS.map(function (c, i) {
-                return { key: c.key, label: c.label, symbol: c.symbol, balance: hexToNumber(rabbyHex[i]) };
-              })
+              chains: rabbyChains,
+              totalUsd: rabbyTotalUsd
             },
             nfts: nfts,
             shaniu: { balance: shaniuBal, contract: SHANIU_CONTRACT },
