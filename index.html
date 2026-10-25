@@ -42,7 +42,39 @@
         font-size: 16px;
         line-height: 1.45;
       }
-      main { max-width: 1024px; margin: 0 auto; padding: 16px 16px 40px; }
+      main { max-width: 1024px; margin: 0 auto; padding: 16px 16px 40px; position: relative; z-index: 1; }
+
+      /* ---------- Latar halaman bergerak ---------- */
+      /* Lapisan gerak di belakang seluruh konten: cahaya hijau aksen & emas
+         tema yang melayang perlahan + pola titik halus yang naik, supaya
+         halaman terasa hidup tanpa mengganggu keterbacaan (kartu tetap
+         berlatar solid di atasnya). Mati total saat reduced-motion. */
+      .bg-motion { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+      .bg-glow { position: absolute; border-radius: 50%; filter: blur(70px); will-change: transform; }
+      .bg-glow-a {
+        width: 55vmax; height: 55vmax; left: -18vmax; top: -22vmax;
+        background: radial-gradient(circle, rgba(63, 206, 124, 0.20), transparent 65%);
+        animation: bg-drift-a 26s ease-in-out infinite alternate;
+      }
+      .bg-glow-b {
+        width: 48vmax; height: 48vmax; right: -16vmax; bottom: -20vmax;
+        background: radial-gradient(circle, rgba(229, 184, 78, 0.13), transparent 65%);
+        animation: bg-drift-b 32s ease-in-out infinite alternate;
+      }
+      .bg-glow-c {
+        width: 38vmax; height: 38vmax; right: 14%; top: -16vmax;
+        background: radial-gradient(circle, rgba(63, 206, 124, 0.10), transparent 65%);
+        animation: bg-drift-a 38s ease-in-out infinite alternate-reverse;
+      }
+      @keyframes bg-drift-a { from { transform: translate(0, 0) scale(1); } to { transform: translate(9vmax, 6vmax) scale(1.12); } }
+      @keyframes bg-drift-b { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-8vmax, -7vmax) scale(0.95); } }
+      .bg-dots {
+        position: absolute; inset: 0; opacity: 0.35;
+        background-image: radial-gradient(rgba(233, 241, 234, 0.14) 1px, transparent 1.4px);
+        background-size: 26px 26px;
+        animation: bg-dots-rise 12s linear infinite;
+      }
+      @keyframes bg-dots-rise { from { background-position: 0 0; } to { background-position: 0 -26px; } }
       h1, h2, h3, h4 { margin: 0; }
       p { margin: 0; }
       button { font: inherit; cursor: pointer; }
@@ -210,6 +242,9 @@
       details.card ol { margin: 12px 0 0; padding-left: 20px; font-size: 14px; }
       details.card li { margin-top: 8px; }
       .usulan-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 12px; }
+      /* Kartu usulan memakai latar logo yang sama seperti kartu proyek:
+         wadah relatif + overflow hidden supaya logo latar tidak bocor. */
+      .usl-card { position: relative; overflow: hidden; }
       .usulan-steps { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
       .usulan-steps li { margin-top: 4px; }
       /* ---------- Tab ---------- */
@@ -252,8 +287,8 @@
         transform: translateY(-2px);
       }
       .deadline-card.urgent:hover { border-color: var(--red); }
-      .proj-card:hover .proj-logo-bg, .deadline-card:hover .proj-logo-bg { opacity: 0.28; }
-      .proj-card:hover .proj-mono-bg, .deadline-card:hover .proj-mono-bg { opacity: 0.2; }
+      .proj-card:hover .proj-logo-bg, .deadline-card:hover .proj-logo-bg, .usl-card:hover .proj-logo-bg { opacity: 0.28; }
+      .proj-card:hover .proj-mono-bg, .deadline-card:hover .proj-mono-bg, .usl-card:hover .proj-mono-bg { opacity: 0.2; }
       .note-toggle:hover { color: var(--text); text-decoration: underline; }
       .contract-btn:hover { color: var(--accent); }
       .nft-thumbs img:hover { transform: scale(1.06); border-color: var(--accent); }
@@ -274,6 +309,7 @@
       .tick-in { animation: tick-in 0.45s ease-out; }
       @media (prefers-reduced-motion: reduce) {
         .tick-in { animation: none; }
+        .bg-glow, .bg-dots { animation: none; }
         .progress-fill { transition: none; }
         .card, .btn, .tab-btn, .nft-thumbs img, .proj-logo-bg, .proj-mono-bg { transition: none; }
         .summary-cell:hover, .deadline-card:hover, .proj-card:hover,
@@ -282,6 +318,12 @@
     </style>
   </head>
   <body>
+    <div class="bg-motion" aria-hidden="true">
+      <span class="bg-glow bg-glow-a"></span>
+      <span class="bg-glow bg-glow-b"></span>
+      <span class="bg-glow bg-glow-c"></span>
+      <span class="bg-dots"></span>
+    </div>
     <main>
       <nav class="tabbar" role="tablist" aria-label="Navigasi halaman">
         <button type="button" class="tab-btn" role="tab" data-tab="beranda" aria-selected="true">Beranda</button>
@@ -1353,7 +1395,8 @@
                                              : "Belum terkonfirmasi — status di Sheet: " + (u.status || "usulan"));
           var howTo = (info && info.howTo) || u.howTo ||
             "Buka situs proyek dan hubungkan wallet; Kerjakan quest / aktivitas testnet / program poin di dashboard resminya; Pantau kanal resmi untuk pengumuman snapshot & kriteria airdrop";
-          html += "<li class='card'><div class='proj-head'><div class='proj-title'>" + logoHtml(u).chip + "<h4 style='font-size:16px'>" + esc(u.name) + "</h4></div>" +
+          var ulogo = logoHtml(u);
+          html += "<li class='card usl-card'>" + ulogo.bg + "<div class='proj-inner'><div class='proj-head'><div class='proj-title'>" + ulogo.chip + "<h4 style='font-size:16px'>" + esc(u.name) + "</h4></div>" +
             (u.status ? "<span class='badge badge-amber'>" + esc(u.status) + "</span>" : "") + "</div>";
           if (u.why) html += "<p class='small' style='margin-top:6px'>" + esc(u.why) + "</p>";
           html += "<p class='small' style='margin-top:10px;font-weight:600'>Cara kerjakan task-nya</p><ol class='usulan-steps'>";
@@ -1379,7 +1422,7 @@
           var uxUrl = xUrl(u.x);
           if (uxUrl) btns += "<a class='btn btn-chip' href='" + esc(uxUrl) + "' target='_blank' rel='noopener noreferrer'>Buka X proyek ↗</a>";
           if (btns) html += "<div class='copy-row'>" + btns + "</div>";
-          html += "</li>";
+          html += "</div></li>";
         });
         $("usulan-body").innerHTML = html + "</ul>";
       }
