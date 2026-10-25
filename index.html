@@ -3,28 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <!-- Tema terang dikunci: mode gelap HP pernah membuat halaman ini tampil
-         hitam polos, jadi tidak ada varian gelap sama sekali. -->
-    <meta name="color-scheme" content="light" />
+    <!-- Tema gelap dikunci atas permintaan pemilik halaman: latar gelap dengan
+         teks & aksen terang berkontras tinggi supaya tetap jelas dibaca. -->
+    <meta name="color-scheme" content="dark" />
     <link rel="icon" href="data:," />
     <title>Airdrop Tracker</title>
     <style>
       :root {
-        color-scheme: light;
-        --bg: #f6f4ee;
-        --surface: #ffffff;
-        --surface-alt: #efece2;
-        --text: #17251d;
-        --dim: #5c6f63;
-        --border: #ddd8c8;
-        --accent: #0d7a4a;
-        --accent-soft: #e3f2e8;
-        --gold: #b8860b;
-        --gold-soft: #faf0d7;
-        --red: #c62f3b;
-        --red-soft: #fbe7e8;
-        --amber: #a86e00;
-        --amber-soft: #fbf0d3;
+        color-scheme: dark;
+        --bg: #0d120e;
+        --surface: #161d17;
+        --surface-alt: #232c24;
+        --text: #e9f1ea;
+        --dim: #a9bcab;
+        --border: #35423a;
+        --accent: #3fce7c;
+        --accent-soft: #16382a;
+        --on-accent: #06130b;
+        --gold: #e5b84e;
+        --gold-soft: #3a2c10;
+        --red: #ff7a72;
+        --red-soft: #401e22;
+        --amber: #f0a832;
+        --amber-soft: #3a2a0e;
         --radius: 14px;
       }
       * { box-sizing: border-box; }
@@ -72,11 +73,13 @@
         font-size: 14px;
         font-weight: 600;
       }
+      a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+      a.btn:hover { border-color: var(--accent); color: var(--accent); }
       .btn-dark { background: var(--text); color: var(--bg); border-color: var(--text); }
-      .btn-focus-on { background: var(--red); border-color: var(--red); color: #fff; }
+      .btn-focus-on { background: var(--red); border-color: var(--red); color: var(--on-accent); }
       .btn-chip { padding: 6px 10px; font-size: 12px; font-weight: 500; }
       .btn-filter { padding: 8px 14px; font-weight: 500; }
-      .btn-filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .btn-filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
       .actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
       /* ---------- Deadline ---------- */
@@ -178,7 +181,7 @@
       #toast p {
         background: var(--text); color: var(--bg); border-radius: 999px;
         padding: 8px 16px; font-size: 14px; font-weight: 500;
-        box-shadow: 0 8px 24px rgba(23, 37, 29, 0.25);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
       }
       @keyframes tick-in { from { opacity: 0.25; } to { opacity: 1; } }
       .tick-in { animation: tick-in 0.45s ease-out; }
@@ -301,7 +304,8 @@
          Airdrop Tracker — halaman statis, data hidup dari browser:
          proyek dari Google Sheet (gviz), saldo/NFT/floor dari RPC publik
          BSC & feed agentpunk.fun, kurs BNB dari Coinbase. Semua sumber
-         CORS-terbuka. Tanpa tautan keluar: semua referensi = tombol salin.
+         CORS-terbuka. Tautan situs proyek & X dibuka langsung di tab baru;
+         alamat wallet/kontrak tetap tombol salin.
          ===================================================================== */
 
       // ---------- Util ----------
@@ -332,6 +336,23 @@
         return "$" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
       function shortAddr(a) { return a.slice(0, 6) + "…" + a.slice(-4); }
+      // Tautan proyek dibuka langsung (bukan disalin). Hanya URL http(s)
+      // yang diteruskan; nilai lain diabaikan supaya href tidak rusak.
+      function projectUrl(raw) {
+        var u = String(raw == null ? "" : raw).trim();
+        if (!u) return "";
+        if (/^https?:\/\//i.test(u)) return u;
+        if (/^www\./i.test(u)) return "https://" + u;
+        return "";
+      }
+      function xUrl(raw) {
+        var u = String(raw == null ? "" : raw).trim();
+        if (!u) return "";
+        if (/^https?:\/\//i.test(u)) return u;
+        if (u.charAt(0) === "@") return "https://x.com/" + u.slice(1);
+        if (/^(x\.com|twitter\.com)\//i.test(u)) return "https://" + u;
+        return "";
+      }
 
       // ---------- Toast salin ----------
       var toastTimer = null;
@@ -850,8 +871,10 @@
           }
         }
         var btns = "";
-        if (p.link) btns += "<button type='button' class='btn btn-chip' data-copy='" + esc(p.link) + "' data-label='Tautan " + esc(p.name) + "'>Salin tautan proyek</button>";
-        if (p.x) btns += "<button type='button' class='btn btn-chip' data-copy='" + esc(p.x) + "' data-label='Tautan X " + esc(p.name) + "'>Salin tautan X</button>";
+        var pUrl = projectUrl(p.link);
+        if (pUrl) btns += "<a class='btn btn-chip' href='" + esc(pUrl) + "' target='_blank' rel='noopener noreferrer'>Buka situs proyek ↗</a>";
+        var pxUrl = xUrl(p.x);
+        if (pxUrl) btns += "<a class='btn btn-chip' href='" + esc(pxUrl) + "' target='_blank' rel='noopener noreferrer'>Buka X proyek ↗</a>";
         if (btns) html += "<div class='copy-row'>" + btns + "</div>";
         return html + "</article>";
       }
@@ -952,7 +975,8 @@
           if (u.risk) meta.push("Risiko: " + u.risk);
           if (u.date) meta.push(u.date);
           if (meta.length) html += "<p class='tiny dim' style='margin-top:6px'>" + esc(meta.join(" · ")) + "</p>";
-          if (u.link) html += "<div class='copy-row'><button type='button' class='btn btn-chip' data-copy='" + esc(u.link) + "' data-label='Tautan " + esc(u.name) + "'>Salin tautan proyek</button></div>";
+          var uUrl = projectUrl(u.link);
+          if (uUrl) html += "<div class='copy-row'><a class='btn btn-chip' href='" + esc(uUrl) + "' target='_blank' rel='noopener noreferrer'>Buka situs proyek ↗</a></div>";
           html += "</li>";
         });
         $("usulan-body").innerHTML = html + "</ul>";
