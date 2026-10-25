@@ -6,6 +6,10 @@
     <!-- Tema gelap dikunci atas permintaan pemilik halaman: latar gelap dengan
          teks & aksen terang berkontras tinggi supaya tetap jelas dibaca. -->
     <meta name="color-scheme" content="dark" />
+    <!-- CSP: halaman ini murni baca-saja. Koneksi keluar hanya boleh ke sumber
+         data yang memang dipakai (Sheet, Coinbase, agentpunk.fun, RPC publik);
+         tidak ada objek/form/frame, gambar hanya dari aset lokal & data:. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://docs.google.com https://api.coinbase.com https://agentpunk.fun https://bsc-dataseed.bnbchain.org https://bsc-rpc.publicnode.com https://polygon-bor-rpc.publicnode.com https://ethereum-rpc.publicnode.com https://mainnet.base.org https://arb1.arbitrum.io; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'" />
     <link rel="icon" href="data:," />
     <title>Airdrop Tracker</title>
     <style>
@@ -108,7 +112,6 @@
       .chain-list { list-style: none; margin: 12px 0 0; padding: 0; }
       .chain-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: 14px; }
       .addr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-      .blur-balance { filter: blur(6px); user-select: none; }
 
       /* ---------- NFT ---------- */
       .total-banner { background: var(--accent-soft); border-radius: 10px; padding: 12px 16px; margin-top: 12px; }
@@ -514,6 +517,12 @@
       var hideBalances = false;
       var walletState = null; // hasil fetch terakhir yang berhasil dirender
 
+      // Privasi saldo: saat disembunyikan, angka TIDAK dirender sama sekali —
+      // diganti placeholder, bukan sekadar di-blur (blur menyisakan angka asli
+      // di DOM yang bisa dibaca dari source/inspect).
+      var MASK_BAL = "••••••";
+      function balText(realHtml) { return hideBalances ? MASK_BAL : realHtml; }
+
       function changeChip(pct) {
         if (pct == null) return "";
         if (Math.abs(pct) < 0.05) return '<span class="tiny dim">0% dari cek sebelumnya</span>';
@@ -558,7 +567,6 @@
         walletState = w;
         var a = w.agentic;
         var totalOwned = w.nfts.reduce(function (s, n) { return s + (n.owned || 0); }, 0);
-        var blur = hideBalances ? " blur-balance" : "";
         var statusHtml = "Saldo &amp; kepemilikan dibaca langsung dari chain saat halaman dibuka · terakhir " +
           fmtWib(w.fetchedAt);
         if (w.bnbPriceUsd != null) statusHtml += " · BNB <span class='num'>" + fmtUsd(w.bnbPriceUsd) + "</span>";
@@ -572,17 +580,17 @@
         html += "<article class='card'><div class='section-head'><div>" +
           "<h3 style='font-weight:600'>Binance Agentic Wallet</h3>" +
           "<p class='small dim'>Agent ID " + esc(a.agentId) + " · BSC</p></div>" +
-          "<span class='badge badge-green'>Connected</span></div>" +
-          "<div class='stat-row" + blur + "'>" +
-          "<div><p class='tiny dim'>BNB (live)</p><p class='num val'>" + fmtBnb(a.bnb) +
+          "<span class='badge badge-dim'>Baca saja</span></div>" +
+          "<div class='stat-row'>" +
+          "<div><p class='tiny dim'>BNB (live)</p><p class='num val'>" + balText(fmtBnb(a.bnb) +
           " <span class='tiny' style='font-weight:600;color:var(--dim)'>BNB</span>" +
-          (a.bnb != null && w.bnbPriceUsd != null ? "<span class='small' style='margin-left:6px;font-weight:500;color:var(--dim)'>≈ " + fmtUsd(a.bnb * w.bnbPriceUsd) + "</span>" : "") +
+          (a.bnb != null && w.bnbPriceUsd != null ? "<span class='small' style='margin-left:6px;font-weight:500;color:var(--dim)'>≈ " + fmtUsd(a.bnb * w.bnbPriceUsd) + "</span>" : "")) +
           "</p></div>" +
-          "<div><p class='tiny dim'>BP (AnthroBit)</p><p class='num val'>" + a.bp + "</p></div>" +
+          "<div><p class='tiny dim'>BP (AnthroBit)</p><p class='num val'>" + balText(String(a.bp)) + "</p></div>" +
           "<div><p class='tiny dim'>NFT dimiliki</p><p class='num val'>" + totalOwned +
           " <span class='tiny' style='font-weight:600;color:var(--dim)'>item</span></p></div>" +
           (a.totalUsd != null
-            ? "<div><p class='tiny dim'>Total nilai ≈ USD</p><p class='num val'>" + fmtUsd(a.totalUsd) + "</p></div>"
+            ? "<div><p class='tiny dim'>Total nilai ≈ USD</p><p class='num val'>" + balText(fmtUsd(a.totalUsd)) + "</p></div>"
             : "") +
           "</div>" +
           (a.totalUsd != null
@@ -597,7 +605,7 @@
           "<h3 style='font-weight:600'>Rabby Wallet · EVM</h3>" +
           "<p class='small dim'>Multi-chain · pantau saja</p></div>" +
           "<span class='badge badge-dim'>Watch-only</span></div>" +
-          "<ul class='chain-list" + blur + "'>";
+          "<ul class='chain-list'>";
         w.rabby.chains.forEach(function (c) {
           var usdTxt = "";
           if (c.balance != null && c.priceUsd != null) {
@@ -605,13 +613,13 @@
           }
           html += "<li><span class='dim'>" + esc(c.label) + "</span><span class='num' style='font-weight:600'>" +
             (c.balance == null ? "<span style='font-weight:400;color:var(--dim)'>gagal dimuat</span>"
-              : fmtBnb(c.balance) + " <span class='tiny' style='font-weight:500;color:var(--dim)'>" + esc(c.symbol) + "</span>" + usdTxt) +
+              : balText(fmtBnb(c.balance) + " <span class='tiny' style='font-weight:500;color:var(--dim)'>" + esc(c.symbol) + "</span>" + usdTxt)) +
             "</span></li>";
         });
         if (w.rabby.totalUsd != null) {
           html += "<li style='border-top:1px solid var(--border);margin-top:4px;padding-top:8px'>" +
             "<span style='font-weight:600'>Total semua chain</span>" +
-            "<span class='num' style='font-weight:700'>≈ " + fmtUsd(w.rabby.totalUsd) + "</span></li>";
+            "<span class='num' style='font-weight:700'>" + balText("≈ " + fmtUsd(w.rabby.totalUsd)) + "</span></li>";
         }
         html += "</ul><div class='addr-row'><span class='num small dim'>" + shortAddr(w.rabby.address) + "</span>" +
           "<button type='button' class='btn btn-chip' data-copy='" + w.rabby.address + "' data-label='Alamat Rabby'>Salin alamat</button></div>" +
@@ -623,9 +631,9 @@
           "<h3 style='font-weight:600'>Koleksi NFT · Binance Agentic</h3>" +
           "<p class='small dim'>" + w.totals.collectionsWithFloor + " dari " + w.totals.collectionsTotal + " koleksi punya floor</p></div>" +
           "<p class='tiny dim' style='margin-top:4px'>Foto tiap baris adalah artwork asli dari metadata on-chain token yang dimiliki — tipe NFT-nya langsung kelihatan.</p>" +
-          "<div class='total-banner" + blur + "'><p class='tiny' style='font-weight:500;color:var(--dim)'>Total nilai floor koleksi (floor × jumlah dimiliki)</p>" +
-          "<p class='num big'>" + fmtBnb(w.totals.floorValueBnb) + " BNB" +
-          (w.totals.floorValueUsd != null ? "<span class='small' style='margin-left:8px;font-weight:600;color:var(--dim)'>≈ " + fmtUsd(w.totals.floorValueUsd) + "</span>" : "") +
+          "<div class='total-banner'><p class='tiny' style='font-weight:500;color:var(--dim)'>Total nilai floor koleksi (floor × jumlah dimiliki)</p>" +
+          "<p class='num big'>" + balText(fmtBnb(w.totals.floorValueBnb) + " BNB" +
+          (w.totals.floorValueUsd != null ? "<span class='small' style='margin-left:8px;font-weight:600;color:var(--dim)'>≈ " + fmtUsd(w.totals.floorValueUsd) + "</span>" : "")) +
           "</p><p class='tiny dim' style='margin-top:2px'>Kurs BNB " + (w.bnbPriceUsd != null ? fmtUsd(w.bnbPriceUsd) : "—") +
           " · diperbarui " + fmtWib(w.fetchedAt) + "</p></div>" +
           "<ul class='nft-list'>";
@@ -639,7 +647,7 @@
         });
         html += "</ul><div class='shaniu-row'><p><span style='font-weight:600'>SHANIU</span> " +
           "<span class='num' style='font-weight:600'>" +
-          (w.shaniu.balance != null ? w.shaniu.balance.toLocaleString("id-ID", { maximumFractionDigits: 1 }) : "—") +
+          balText(w.shaniu.balance != null ? w.shaniu.balance.toLocaleString("id-ID", { maximumFractionDigits: 1 }) : "—") +
           "</span> token ERC-20 · belum ada market — tidak ada harga yang bisa ditampilkan.</p></div></article>";
         $("wallet-body").innerHTML = html;
       }
