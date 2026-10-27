@@ -785,8 +785,7 @@
             ? "<p class='tiny dim' style='margin-top:6px'>Total nilai = saldo BNB + nilai floor NFT di bawah.</p>"
             : "") +
           "<div class='addr-row'><span class='num small dim'>" + shortAddr(a.address) + "</span>" +
-          "<button type='button' class='btn btn-chip' data-copy='" + a.address + "' data-label='Alamat Agentic'>Salin alamat</button></div>" +
-          "<p class='tiny dim' style='margin-top:8px'>" + esc(a.sessionNote) + "</p></article>";
+          "<button type='button' class='btn btn-chip' data-copy='" + a.address + "' data-label='Alamat Agentic'>Salin alamat</button></div></article>";
 
         // --- Rabby ---
         html += "<article class='card'><div class='section-head'><div>" +
@@ -949,8 +948,7 @@
             scanNote: "Memeriksa kepemilikan NFT terbaru dari chain untuk koleksi di luar daftar yang dikenal…",
             agentic: {
               address: AGENTIC, agentId: "birashi.ai", bnb: agenticBnb, bp: AGENTIC_BP,
-              totalUsd: agenticTotalUsd,
-              sessionNote: "Sesi s/d Senin 26 Okt 2026 · 22.43 WIB"
+              totalUsd: agenticTotalUsd
             },
             rabby: {
               address: RABBY,
